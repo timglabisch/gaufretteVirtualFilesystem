@@ -1,11 +1,14 @@
 <?php
 
 namespace Pimcore;
+use Pimcore\Filesystem\AdapterStack;
 
 class Filesystem extends \Gaufrette\Filesystem {
 
-    private $adapters = array();
-    private $defaultAdapter = null;
+    /**
+     * @var AdapterStack
+     */
+    protected $adapterStack = null;
 
     /**
      * Constructor
@@ -15,91 +18,20 @@ class Filesystem extends \Gaufrette\Filesystem {
      */
     public function __construct(\Gaufrette\Adapter $defaultAdapter) {
         $this->defaultAdapter = $defaultAdapter;
+        $this->adapterStack = new AdapterStack($defaultAdapter);
+    }
+
+    public function setAdapterStack(AdapterStack $adapter) {
+        return $this->adapterStack = $adapter;
     }
 
     public function mount($path, \Gaufrette\Adapter $adapter) {
-        $this->adapters[$this->resolvePath($path)] = $adapter;
+        $this->adapterStack->append($path, $adapter);
     }
 
     public function getAdapter($filePath) {
-        $adapterAndkey = $this->getAdapterAndKey($filePath);
+        $adapterAndkey = $this->adapterStack->getAdapterAndKey($filePath);
         return $adapterAndkey['adapter'];
-    }
-
-    protected function relativePath($path) {
-        $path = str_replace(array('/', '\\'), '/', $path);
-        $parts = array_filter(explode('/', $path), 'strlen');
-        $absolutes = array();
-        foreach ($parts as $part) {
-            if ('.' == $part) continue;
-            if ('..' == $part) {
-                array_pop($absolutes);
-            } else {
-                $absolutes[] = $part;
-            }
-        }
-
-        // may we now have an empty path, if we have an empty path
-        // you have to make sure, that we return a / for the main diectory
-        if($path = implode(DIRECTORY_SEPARATOR, $absolutes))
-            return $path;
-
-        return '/';
-    }
-
-    protected function resolvePath($filePath) {
-        if(empty($filePath))
-            return '/';
-
-        // resolving a path is very expensive, so lets first check if it it necessary
-        if(strpos($filePath, '/../') !== -1)
-            $filePath = $this->relativePath($filePath);
-
-        // revmove the first / if necessary, we always start from the root node.
-        if($filePath[0] == '/')
-            $filePath = substr($filePath, 1);
-
-        return $filePath;
-    }
-
-    public function getAdapterAndKey($filePathRaw) {
-
-        $filePath = $this->resolvePath($filePathRaw);
-
-        $return['adapter'] = $this->defaultAdapter;
-        $return['key'] = $filePath;
-        $score = 0;
-
-        $filePathParts = explode('/', $filePath);
-
-        foreach($this->adapters as $currentAdapterPath => $currentAdapter) {
-
-            $adapterPathParts = explode('/', $currentAdapterPath);
-            $maxRows = min(count($adapterPathParts), count($filePathParts));
-
-            if($score >= $maxRows)
-                continue;
-
-            for($i = 0; $i < $maxRows; $i++) {
-
-                // if the directory Paths are different we dont have to
-                // increase the score for the adapter
-                if($adapterPathParts[$i] !== $filePathParts[$i])
-                    break;
-
-                // the adapter matchs some parts of the code,
-                // but may there is a "better" adapter
-                if($i < $score)
-                    continue;
-
-                $return['adapter'] = $currentAdapter;
-                $return['key'] = join(DIRECTORY_SEPARATOR, array_slice($filePathParts, $i + 1));
-                $score = $i + 1;
-            }
-
-        }
-
-        return $return;
     }
 
     /**
@@ -111,7 +43,7 @@ class Filesystem extends \Gaufrette\Filesystem {
      */
     public function has($key)
     {
-        $keyAndAdapter = $this->getAdapterAndKey($key);
+        $keyAndAdapter = $this->adapterStack->getAdapterAndKey($key);
         return $keyAndAdapter['adapter']->exists($keyAndAdapter['key']);
     }
 
@@ -127,8 +59,8 @@ class Filesystem extends \Gaufrette\Filesystem {
     {
         throw new \Exception('not implemented now');
 
-        $keyAndAdapter = $this->getAdapterAndKey($key);
-        return $keyAndAdapter['adapter']->rename($keyAndAdapter['key']);
+        #$keyAndAdapter = $this->adapterStack->getAdapterAndKey($key);
+        #return $keyAndAdapter['adapter']->rename($keyAndAdapter['key']);
     }
 
     /**
@@ -146,7 +78,7 @@ class Filesystem extends \Gaufrette\Filesystem {
             throw new \InvalidArgumentException(sprintf('The file %s already exists and can not be overwritten.', $key));
         }
 
-        $keyAndAdapter = $this->getAdapterAndKey($key);
+        $keyAndAdapter = $this->adapterStack->getAdapterAndKey($key);
         return $keyAndAdapter['adapter']->write($keyAndAdapter['key'], $content, $metadata);
     }
 
@@ -163,7 +95,7 @@ class Filesystem extends \Gaufrette\Filesystem {
             throw new \InvalidArgumentException(sprintf('The file %s does not exist.', $key));
         }
 
-        $keyAndAdapter = $this->getAdapterAndKey($key);
+        $keyAndAdapter = $this->adapterStack->getAdapterAndKey($key);
         return $keyAndAdapter['adapter']->read($keyAndAdapter['key']);
     }
 
@@ -180,7 +112,7 @@ class Filesystem extends \Gaufrette\Filesystem {
             throw new \InvalidArgumentException(sprintf('The file %s does not exist.', $key));
         }
 
-        $keyAndAdapter = $this->getAdapterAndKey($key);
+        $keyAndAdapter = $this->adapterStack->getAdapterAndKey($key);
         return $keyAndAdapter['adapter']->delete($keyAndAdapter['key']);
     }
 
@@ -201,7 +133,7 @@ class Filesystem extends \Gaufrette\Filesystem {
      */
     public function listDirectory($directory = '')
     {
-        $keyAndAdapter = $this->getAdapterAndKey($directory);
+        $keyAndAdapter = $this->adapterStack->getAdapterAndKey($directory);
 
         if (method_exists($keyAndAdapter['adapter'], 'listDirectory'))
             return $keyAndAdapter['adapter']->listDirectory($keyAndAdapter['key']);
@@ -218,7 +150,7 @@ class Filesystem extends \Gaufrette\Filesystem {
      */
     public function mtime($key)
     {
-        $keyAndAdapter = $this->getAdapterAndKey($key);
+        $keyAndAdapter = $this->adapterStack->getAdapterAndKey($key);
         return $keyAndAdapter['adapter']->mtime($keyAndAdapter['key']);
     }
 
@@ -231,13 +163,13 @@ class Filesystem extends \Gaufrette\Filesystem {
      */
     public function checksum($key)
     {
-        $keyAndAdapter = $this->getAdapterAndKey($key);
+        $keyAndAdapter = $this->adapterStack->getAdapterAndKey($key);
         return $keyAndAdapter['adapter']->checksum($keyAndAdapter['key']);
     }
 
     public function supportsMetadata($key)
     {
-        $keyAndAdapter = $this->getAdapterAndKey($key);
+        $keyAndAdapter = $this->adapterStack->getAdapterAndKey($key);
         return $keyAndAdapter['adapter']->supportsMetadata($keyAndAdapter['key']);
     }
 
@@ -250,7 +182,7 @@ class Filesystem extends \Gaufrette\Filesystem {
      */
     public function createFileStream($key)
     {
-        $keyAndAdapter = $this->getAdapterAndKey($key);
+        $keyAndAdapter = $this->adapterStack->getAdapterAndKey($key);
         return $keyAndAdapter['adapter']->createFileStream($keyAndAdapter['key'], $this);
     }
 
@@ -263,7 +195,7 @@ class Filesystem extends \Gaufrette\Filesystem {
      */
     public function createFile($key)
     {
-        $keyAndAdapter = $this->getAdapterAndKey($key);
+        $keyAndAdapter = $this->adapterStack->getAdapterAndKey($key);
         return $keyAndAdapter['adapter']->createFile($keyAndAdapter['key'], $this);
     }
 
