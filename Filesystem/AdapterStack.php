@@ -2,13 +2,14 @@
 
 namespace Pimcore\Filesystem;
 use Pimcore\Filesystem\PathResolver;
+use Gaufrette\Adapter;
 
 class AdapterStack extends \ArrayObject {
 
     public $defaultAdaper = null;
     public $pathResolver = null;
 
-    function __construct($defaultAdaper) {
+    function __construct(Adapter $defaultAdaper) {
         $this->setDefaultAdapter($defaultAdaper);
     }
 
@@ -22,6 +23,10 @@ class AdapterStack extends \ArrayObject {
         return $this->pathResolver;
     }
 
+    public function setPathResolver(PathResolver $pathResolver) {
+        $this->pathResolver = $pathResolver;
+    }
+
     function setDefaultAdapter($defaultAdaper) {
         $this->defaultAdaper = $defaultAdaper;
     }
@@ -30,14 +35,29 @@ class AdapterStack extends \ArrayObject {
         return $this->defaultAdaper;
     }
 
-    function append($path, $adapter) {
-        $this[$this->getPathResolver()->resolve($path)] = $adapter;
+    function append($path, Adapter $adapter) {
+        $key = $this->getPathResolver()->resolve($path);
+
+        // TODO
+        //if(!isset($this[$key]))
+        //    throw new \InvalidArgumentException('adapter for Path '.$key.' is already registered');
+
+        $this[$key] = $adapter;
     }
 
+    /**
+     * @param $filePathRaw
+     * @return array
+     *
+     * this method returns the driver and the key (relativeFilename)
+     * this is a bit ugly but if we need the key we must know the adapter
+     * and if we need the adapter, we must know the key.
+     */
     public function getAdapterAndKey($filePathRaw) {
 
         $filePath = $this->getPathResolver()->resolve($filePathRaw);
 
+        // set default values
         $return['adapter'] = $this->getDefaultAdapter();
         $return['key'] = $filePath;
         $score = 0;

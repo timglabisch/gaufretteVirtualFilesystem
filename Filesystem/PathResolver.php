@@ -37,6 +37,11 @@ class PathResolver {
         if($filePath[0] == '/')
             $filePath = substr($filePath, 1);
 
+        // Path is invalide, normal times this happens if we have something
+        // like /.. as path. so just use the root instead
+        if(!$filePath)
+            return '/';
+
         return $filePath;
     }
 
