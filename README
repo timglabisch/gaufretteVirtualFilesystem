@@ -1,1 +1,67 @@
-INIT
+#### gaufretteVirtualFilesystem
+
+this project is about having a complete virtual
+Filesystem including different mount-points based on the
+great Gaufrette Filesystem.
+
+This means you can create a new Filesystem and mount Gaufrette Adapters
+at a special Path to it. For example use /etc to store Files in the Amazon S3,
+/assets/images on our NAS and /assets/tmp inmemory.
+
+This project just makes sure that the correct Gaufrette Adapter with correct
+Path is used. For example
+
+```php
+
+// keep in mind that the Filesystem is used ontop of the
+// Gaufrette-Adapters
+use \Gaufrette\Adapter\InMemory as AdapterInMemory;
+use \Gaufrette\File;
+use \Pimcore\Filesystem as Filesystem;
+
+
+// at first you need a default adapter where everything is stored
+// where nothing is mounted to.
+$adapter = new AdapterInMemory();
+
+// than you need to create a filesystem
+$filesystem = new Filesystem($adapter);
+
+// now you can create a bunch of adapters for different usecases and
+// mount them to the Filesystem.
+$etc = new AdapterInMemory();
+$filesystem->mount('/etc', $etc);
+
+$var = new AdapterInMemory();
+$filesystem->mount('/var', $var);
+
+$var_www = new AdapterInMemory();
+$filesystem->mount('/var/www', $var_www);
+
+
+// you are now ready to write and fetch content based on the Filesystem:
+// this example fetchs the testFile from the adapter in the adapter stored in
+// the $etc variable.
+$this->assertEquals($filesystem->get('/etc/testFile')->getContent(), '...');
+
+
+// this lib supperts a lot of different conventions, have a look at this example:
+$adapter = new AdapterInMemory();
+$filesystem = new Filesystem($adapter);
+
+$file = new File('testFile', $filesystem);
+$file->setContent('Hello World!');
+
+$this->assertEquals($filesystem->get('/testFile')->getContent(), 'Hello World!');
+$this->assertEquals($filesystem->get('testFile')->getContent(), 'Hello World!');
+$this->assertEquals($filesystem->get('foo/../testFile')->getContent(), 'Hello World!');
+$this->assertEquals($filesystem->get('/foo/../testFile')->getContent(), 'Hello World!');
+$this->assertEquals($filesystem->get('foo/2/../4/../../testFile')->getContent(), 'Hello World!');
+$this->assertEquals($filesystem->get('/foo/2/../4/../../testFile')->getContent(), 'Hello World!');
+
+
+// of course you can use all Adapters provided by Gaufrette.
+// and add own providers by implementing an easy interface
+
+
+```
