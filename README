@@ -13,6 +13,8 @@ Path is used. For example
 
 
 ```php
+
+
 // keep in mind that the Filesystem is used ontop of the
 // Gaufrette-Adapters
 use \Gaufrette\Adapter\InMemory as AdapterInMemory;
@@ -20,8 +22,8 @@ use \Gaufrette\File;
 use \Pimcore\Filesystem as Filesystem;
 
 
-// at first you need a default adapter where everything is stored
-// where nothing is mounted to.
+// at first you need a default adapter
+// every file that doesnt match a mountpoint will use this adapter
 $adapter = new AdapterInMemory();
 
 // than you need to create a filesystem
@@ -35,6 +37,7 @@ $filesystem->mount('/etc', $etc);
 $var = new AdapterInMemory();
 $filesystem->mount('/var', $var);
 
+// here you can see, that you also can have submounpoints.
 $var_www = new AdapterInMemory();
 $filesystem->mount('/var/www', $var_www);
 
@@ -62,4 +65,6 @@ $this->assertEquals($filesystem->get('/foo/2/../4/../../testFile')->getContent()
 
 // of course you can use all Adapters provided by Gaufrette.
 // and add own providers by implementing an easy interface
+
+
 ```
