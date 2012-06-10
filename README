@@ -1,5 +1,4 @@
-#### gaufretteVirtualFilesystem
-
+*** gaufretteVirtualFilesystem
 this project is about having a complete virtual
 Filesystem including different mount-points based on the
 great Gaufrette Filesystem.
@@ -11,8 +10,9 @@ at a special Path to it. For example use /etc to store Files in the Amazon S3,
 This project just makes sure that the correct Gaufrette Adapter with correct
 Path is used. For example
 
-```php
 
+
+```php
 // keep in mind that the Filesystem is used ontop of the
 // Gaufrette-Adapters
 use \Gaufrette\Adapter\InMemory as AdapterInMemory;
@@ -62,6 +62,4 @@ $this->assertEquals($filesystem->get('/foo/2/../4/../../testFile')->getContent()
 
 // of course you can use all Adapters provided by Gaufrette.
 // and add own providers by implementing an easy interface
-
-
 ```
